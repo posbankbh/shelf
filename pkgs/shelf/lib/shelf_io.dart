@@ -42,6 +42,25 @@ export 'src/io_server.dart' show IOServer;
 /// See the documentation for [HttpServer.bind] and [HttpServer.bindSecure]
 /// for more details on [address], [port], [backlog], and [shared].
 ///
+/// The [onError] callback must be of type `void Function(Object error)` or
+/// `void Function(Object error, StackTrace)`.
+/// The function type determines whether [onError] is invoked with a stack
+/// trace argument.
+/// The stack trace argument may be [StackTrace.empty] if this stream received
+/// an error without a stack trace.
+///
+/// Otherwise it is called with just the error object.
+/// If [onError] is omitted, any errors on this stream are considered unhandled,
+/// and will be passed to the current [Zone]'s error handler.
+/// By default unhandled async errors are treated
+/// as if they were uncaught top-level errors.
+///
+/// If this stream closes and sends a done event, the [onDone] handler is
+/// called. If [onDone] is `null`, nothing happens.
+///
+/// If [cancelOnError] is `true`, the subscription is automatically canceled
+/// when the first error event is delivered. The default is `false`.
+///
 /// {@template shelf_io_header_defaults}
 /// Every response will get a "date" header and an "X-Powered-By" header.
 /// If the either header is present in the `Response`, it will not be
@@ -57,6 +76,9 @@ Future<HttpServer> serve(
   int? backlog,
   bool shared = false,
   String? poweredByHeader = 'Dart with package:shelf',
+  Function? onError,
+  void Function()? onDone,
+  bool? cancelOnError,
 }) async {
   backlog ??= 0;
   var server = await (securityContext == null
@@ -68,7 +90,7 @@ Future<HttpServer> serve(
           backlog: backlog,
           shared: shared,
         ));
-  serveRequests(server, handler, poweredByHeader: poweredByHeader);
+  serveRequests(server, handler, poweredByHeader: poweredByHeader, onError: onError, onDone: onDone, cancelOnError: cancelOnError);
   return server;
 }
 
@@ -82,15 +104,37 @@ Future<HttpServer> serve(
 /// by [handler] will be printed to the console or, if there's an active error
 /// zone, passed to that zone.
 ///
+/// The [onError] callback must be of type `void Function(Object error)` or
+/// `void Function(Object error, StackTrace)`.
+/// The function type determines whether [onError] is invoked with a stack
+/// trace argument.
+/// The stack trace argument may be [StackTrace.empty] if this stream received
+/// an error without a stack trace.
+///
+/// Otherwise it is called with just the error object.
+/// If [onError] is omitted, any errors on this stream are considered unhandled,
+/// and will be passed to the current [Zone]'s error handler.
+/// By default unhandled async errors are treated
+/// as if they were uncaught top-level errors.
+///
+/// If this stream closes and sends a done event, the [onDone] handler is
+/// called. If [onDone] is `null`, nothing happens.
+///
+/// If [cancelOnError] is `true`, the subscription is automatically canceled
+/// when the first error event is delivered. The default is `false`.
+///
 /// {@macro shelf_io_header_defaults}
 void serveRequests(
   Stream<HttpRequest> requests,
   Handler handler, {
   String? poweredByHeader = 'Dart with package:shelf',
+  Function? onError,
+  void Function()? onDone,
+  bool? cancelOnError
 }) {
   catchTopLevelErrors(() {
     requests.listen((request) =>
-        handleRequest(request, handler, poweredByHeader: poweredByHeader));
+        handleRequest(request, handler, poweredByHeader: poweredByHeader), onError: onError, onDone: onDone, cancelOnError: cancelOnError);
   }, (error, stackTrace) {
     _logTopLevelError('Asynchronous error\n$error', stackTrace);
   });
